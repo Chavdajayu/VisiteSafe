@@ -80,7 +80,7 @@ self.addEventListener('notificationclick', (event) => {
 
   if (action === 'APPROVE_VISITOR' || action === 'REJECT_VISITOR') {
     // Perform API call in background WITHOUT opening app
-    let url = action === 'APPROVE_VISITOR' ? data.actionUrlApprove : data.actionUrlReject;
+    let url = action === 'APPROVE_VISITOR' ? (data.actionUrlApprove || data.approveUrl) : (data.actionUrlReject || data.rejectUrl);
 
     // Fallback URL construction if not provided in payload
     if (!url && data.requestId && data.residencyId) {
@@ -103,6 +103,23 @@ self.addEventListener('notificationclick', (event) => {
         })
         .then(responseData => {
           console.log('Background action success:', responseData);
+
+          // Show silent success notification or update existing one
+          // We can't update the closed one, so we show a new brief one or just nothing if user wants silent.
+          // Requirement: "Show success/failure notification silently" -> This usually means a toast or a new silent notification.
+          // Let's show a silent "Done" notification that auto-closes or is minimal.
+
+          self.registration.showNotification(
+            action === 'APPROVE_VISITOR' ? 'Visitor Approved' : 'Visitor Rejected',
+            {
+              body: action === 'APPROVE_VISITOR' ? 'Access granted.' : 'Access denied.',
+              icon: '/icons/icon-192.png',
+              tag: 'action-confirmation', // Replaces previous if same tag
+              silent: true, // Don't vibrate/sound again
+              timeout: 3000 // Close after 3s (not supported everywhere but good intent)
+            }
+          );
+
           // Send message to app for UI sync (if app is open)
           return clients.matchAll({ type: 'window', includeUncontrolled: true })
             .then(windowClients => {
@@ -114,11 +131,17 @@ self.addEventListener('notificationclick', (event) => {
                   status: action === 'APPROVE_VISITOR' ? 'approved' : 'rejected'
                 });
               });
-              // DO NOT open or focus app - action completed in background
             });
         })
         .catch(err => {
           console.error('Background action failed:', err);
+          self.registration.showNotification('Action Failed', {
+            body: 'Could not process request. Tap to try in app.',
+            icon: '/icons/icon-192.png',
+            tag: 'action-error',
+            data: { url: `/?requestId=${data.requestId}` } // Click opens app
+          });
+
           // Send failure message to app (if open)
           clients.matchAll({ type: 'window', includeUncontrolled: true })
             .then(windowClients => {
@@ -138,20 +161,18 @@ self.addEventListener('notificationclick', (event) => {
       console.error('No action URL provided and insufficient data to construct fallback');
     }
   } else {
-    // Default click - open app only for non-action clicks
-    // Prioritize deep linking if requestId is present
+    // Default click - open app logic...
     let urlToOpen = data.click_action || '/';
+    // Deep link logic
     if (data.requestId && urlToOpen === '/') {
-      urlToOpen = `/resident-dashboard?requestId=${data.requestId}`;
+      urlToOpen = `/?requestId=${data.requestId}`; // Simplified deep link
     }
 
     event.waitUntil(
       clients.matchAll({ type: 'window', includeUncontrolled: true })
         .then((clientList) => {
           for (const client of clientList) {
-            // Focus if already open
             if (client.url.includes(self.location.origin) && 'focus' in client) {
-              // Optionally navigate to specific request if needed, but focus is primary
               if (urlToOpen !== '/' && client.navigate) {
                 return client.navigate(urlToOpen).then(c => c.focus());
               }
