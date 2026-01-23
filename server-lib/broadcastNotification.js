@@ -7,7 +7,7 @@ initAdmin();
 export default async function handler(req, res) {
   // DEPRECATED: This endpoint is deprecated in favor of /api/sendNotification
   // Keeping for backward compatibility but redirecting to new endpoint
-  
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -19,10 +19,14 @@ export default async function handler(req, res) {
   }
 
   console.log('DEPRECATED: broadcastNotification called, redirecting to sendNotification');
-  
+
   // Redirect to new unified endpoint
   try {
-    const response = await fetch('/api/sendNotification', {
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers.host;
+    const baseUrl = `${protocol}://${host}`;
+
+    const response = await fetch(`${baseUrl}/api/sendNotification`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -30,13 +34,14 @@ export default async function handler(req, res) {
         title,
         body,
         targetType: 'residents',
+        targetId: null, // Broadcast to all residents
         data: {
           type: 'admin-broadcast',
           click_action: '/'
         }
       })
     });
-    
+
     if (response.ok) {
       const result = await response.json();
       return res.status(200).json(result);
