@@ -15,6 +15,7 @@ import sendNotification from '../server-lib/sendNotification.js';
 import visitorDetails from '../server-lib/visitorDetails.js';
 import visitorDecision from '../server-lib/visitorDecision.js';
 import visitorAction from '../server-lib/visitor-action.js';
+import sendVisitorNotification from '../server-lib/sendVisitorNotification.js';
 
 const handlers = {
   createOwner,
@@ -34,6 +35,7 @@ const handlers = {
   'visitor-details': visitorDetails,
   'visitor-decision': visitorDecision,
   'visitor-action': visitorAction,
+  sendVisitorNotification,
 };
 
 export default async function handler(req, res) {

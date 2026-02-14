@@ -13,6 +13,20 @@
         serviceWorkerParam: { scope: "/" },
         notifyButton: { enable: false }
       });
+      OneSignal.Notifications.addEventListener("click", async (event) => {
+        try {
+          const actionId = event?.result?.action?.id || event?.action?.id || event?.button?.id;
+          const requestId = event?.notification?.data?.requestId || event?.data?.requestId;
+          const status = actionId === "approve" ? "approved" : actionId === "reject" ? "rejected" : null;
+          if (status && requestId) {
+            await fetch("/api/update-request-status", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ requestId, status })
+            });
+          }
+        } catch {}
+      });
     });
   </script>
 

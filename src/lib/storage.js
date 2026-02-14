@@ -403,46 +403,24 @@ class StorageService {
       console.error('Error fetching flat/block details:', error);
     }
     
-    // Send notification with approval URLs
+    // Send notification to residents of the flat using OneSignal external_id
     try {
-      const baseUrl = window.location.origin;
-      // Point to API directly for background handling
-      const approveUrl = `${baseUrl}/api/visitor-action?action=approve&residencyId=${residencyId}&requestId=${visitorId}`;
-      const rejectUrl = `${baseUrl}/api/visitor-action?action=reject&residencyId=${residencyId}&requestId=${visitorId}`;
-      
-      const response = await fetch('/api/sendNotification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          residencyId,
-          title: 'New Visitor Request',
-          body: `${data.visitorName} wants to visit ${blockDetails?.name || 'Block'} ${flatDetails?.number || 'Flat'}`,
-          targetType: 'specific_flat',
-          targetId: data.flatId,
-          data: {
-            visitorId: visitorId,
-            actionType: 'VISITOR_REQUEST',
-            requestId: visitorId, // Add requestId for consistency
-            residencyId: residencyId,
-            approvalToken: approvalToken,
-            approveUrl: approveUrl,
-            rejectUrl: rejectUrl,
-            click_action: "/", // Redirect to root on click
+      const residentsRef = collection(db, "residencies", residencyId, "residents");
+      const snapshot = await getDocs(query(residentsRef, where("flatId", "==", String(data.flatId))));
+      const usernames = snapshot.docs.map(d => d.id);
+      for (const username of usernames) {
+        const resp = await fetch('/api/sendVisitorNotification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            residentUsername: username,
             visitorName: data.visitorName,
-            blockName: blockDetails?.name || 'Unknown',
-            flatNumber: flatDetails?.number || 'Unknown',
-            purpose: data.purpose || 'Visit'
-          },
-          webpush: {
-            fcmOptions: {
-                link: "/"
-            }
-          }
-        })
-      });
-      
-      if (!response.ok) {
-        console.error('Notification failed:', await response.text());
+            requestId: visitorId
+          })
+        });
+        if (!resp.ok) {
+          console.error('OneSignal send failed for', username, await resp.text());
+        }
       }
     } catch (e) {
       console.error("Error sending notification:", e);
