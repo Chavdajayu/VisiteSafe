@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     }
     console.log("Sending to external_id:", residentUsername);
     const payload = {
-      app_id: "7304d154-c777-4f86-b61a-5a6e88976cd9",
+      app_id: process.env.ONESIGNAL_APP_ID || "7304d154-c777-4f86-b61a-5a6e88976cd9",
       include_aliases: {
         external_id: [residentUsername]
       },
